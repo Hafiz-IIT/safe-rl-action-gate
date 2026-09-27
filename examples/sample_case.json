@@ -1,0 +1,21 @@
+{
+  "state": {
+    "position": 9,
+    "velocity": 1
+  },
+  "requested": {
+    "acceleration": 2,
+    "name": "speed-up"
+  },
+  "alternatives": [
+    {
+      "acceleration": 0,
+      "name": "hold"
+    },
+    {
+      "acceleration": -1,
+      "name": "brake"
+    }
+  ],
+  "expected_decision": "SUBSTITUTE"
+}
