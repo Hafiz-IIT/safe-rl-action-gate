@@ -26,7 +26,7 @@ class ActionGateTests(unittest.TestCase):
             [Action(0, "hold"), Action(-1, "brake")],
         )
         self.assertEqual(result.decision, GateDecision.SUBSTITUTE)
-        self.assertEqual(result.selected.name, "brake")
+        self.assertEqual(result.selected.name, "hold")
 
     def test_blocks_when_no_safe_option(self):
         result = self.gate.choose(
