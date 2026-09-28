@@ -1,57 +1,53 @@
 # Safe RL Action Gate
 
-> **A transparent runtime shield that can allow, substitute, or block an action before it reaches the environment.**
+> Runtime safety shield for sequential decision systems that allows, substitutes or blocks proposed actions against explicit constraints.
 
-A learned or heuristic policy can propose an action that violates known state constraints. This repository studies a minimal-intervention gate between policy output and environment transition.
+## Status
+**Reproducible research prototype.** Executable Python, deterministic tests, and GitHub Actions CI are included. No production-deployment claim is made.
 
-## What is implemented
+## Problem
+A learned policy may propose an action that is locally high-reward but unsafe. This project separates policy generation from action authorization.
 
-- state and action abstractions
-- deterministic transition model
-- configurable state-safety constraints
-- candidate-action violation checking
-- minimal-intervention safe substitution
-- explicit BLOCK when no safe alternative exists
-- audit-friendly gate result
-
-## Repository map
-
-| Path | Purpose |
-|---|---|
-| `safe_rl_action_gate.py` | Core implementation |
-| `tests/` | Deterministic unit tests |
-| `examples/` | Reproducible synthetic/example input |
-| `docs/architecture.md` | System architecture and decision flow |
-| `docs/research-agenda.md` | Questions, experiments, and publication lineage |
-| `STATUS.md` | Implemented vs. research-stage claims |
-| `CITATION.cff` | Software citation metadata |
-| `NOTICE.md` | Scope and use notice |
+## Architecture
+Policy proposal → transition prediction → constraint checks → minimal-intervention safe substitution → BLOCK when no safe alternative exists.
 
 ## Quick start
-
 ```bash
 python -m unittest discover -s tests -v
 python safe_rl_action_gate.py
 ```
 
-The current prototype uses only the Python standard library unless the implementation itself states otherwise.
+## Implemented
+- Explicit state/action model
+- Configurable safety constraints
+- One-step transition model
+- ALLOW / SUBSTITUTE / BLOCK outcomes
+- Minimal-intervention alternative choice
+- Deterministic tests and CI
 
-## Architecture in one line
-
-**policy action → predict transition → constraint checks → safe alternatives → minimal intervention → ALLOW / SUBSTITUTE / BLOCK**
+## Evaluation
+The prototype measures constraint violations prevented, intervention frequency, fallback availability, and the performance cost of shielding.
 
 ## Research lineage
+- *Control Barrier Functions with Linear Model Residuals for Safe Robot Automation*
+- *Hybrid Control Architectures: Merging LQR and Deep RL for Robust Robot Autonomy*
+- *Towards Interpretable RL for Robotics through Linear Statistical Modeling*
 
-This repository is the executable seed for the historical robotics/control research program combining linear models, classical control, and reinforcement learning.
+## Structure
+- `safe_rl_action_gate.py` — executable core
+- `tests/` — regression tests
+- `docs/ARCHITECTURE.md`
+- `docs/RESEARCH_CONTEXT.md`
+- `docs/EVALUATION.md`
+- `ROADMAP.md`
+- `CITATION.cff`
+- `.github/workflows/tests.yml`
 
-Historical paper titles are preserved as **research directions**, not represented as published papers unless a DOI/preprint record is later added.
+## Limitations
+- One-step deterministic transition model
+- No formal CBF guarantee yet
+- No trained RL policy bundled
+- No continuous optimization layer
 
-## Evaluation plan
-
-Evaluate requested-action intervention rate, constraint violations prevented, unnecessary substitutions, and task degradation under increasingly aggressive policies and model mismatch.
-
-## Current status
-
-**Maturity: reproducible research prototype.** This is not a trained RL policy, not a formal control-barrier-function implementation, and not a proof of closed-loop safety.
-
-See `STATUS.md` and `docs/research-agenda.md` for the exact claims boundary and next empirical steps.
+## License
+MIT.
