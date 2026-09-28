@@ -51,3 +51,14 @@ The prototype measures constraint violations prevented, intervention frequency, 
 
 ## License
 MIT.
+
+## Control research lab
+
+The repository now also contains `control_lab/` with:
+- scalar discrete LQR;
+- residual-controller composition;
+- a transparent Koopman-inspired polynomial lift;
+- Bayesian scalar dynamics uncertainty;
+- a model-mismatch benchmark.
+
+Research protocols are staged under `research/` for residual RL, Koopman embeddings, Bayesian safe RL, and hybrid LQR + learned residual control. These protocols are not publication claims.
