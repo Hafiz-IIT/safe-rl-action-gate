@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Iterable, Sequence
+from typing import Callable, Sequence
+import math
 
 
 class GateDecision(str, Enum):
@@ -16,11 +17,21 @@ class State:
     position: float
     velocity: float
 
+    def __post_init__(self):
+        if not all(math.isfinite(value) for value in (self.position, self.velocity)):
+            raise ValueError("state values must be finite")
+
 
 @dataclass(frozen=True)
 class Action:
     acceleration: float
     name: str = "candidate"
+
+    def __post_init__(self):
+        if not math.isfinite(self.acceleration):
+            raise ValueError("action acceleration must be finite")
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("action name must be a non-empty string")
 
 
 @dataclass(frozen=True)
@@ -35,6 +46,8 @@ Constraint = Callable[[State], bool]
 
 
 def step(state: State, action: Action, dt: float = 1.0) -> State:
+    if not math.isfinite(dt) or dt <= 0:
+        raise ValueError("dt must be finite and positive")
     velocity = state.velocity + action.acceleration * dt
     position = state.position + velocity * dt
     return State(position=position, velocity=velocity)
@@ -42,6 +55,13 @@ def step(state: State, action: Action, dt: float = 1.0) -> State:
 
 class ActionGate:
     def __init__(self, constraints: dict[str, Constraint], dt: float = 1.0):
+        if not math.isfinite(dt) or dt <= 0:
+            raise ValueError("dt must be finite and positive")
+        if not isinstance(constraints, dict) or any(
+            not isinstance(name, str) or not name.strip() or not callable(predicate)
+            for name, predicate in constraints.items()
+        ):
+            raise ValueError("constraints must map non-empty names to callables")
         self.constraints = dict(constraints)
         self.dt = dt
 
@@ -93,6 +113,10 @@ def bounded_constraints(
     max_position: float,
     max_abs_velocity: float,
 ) -> dict[str, Constraint]:
+    if not all(math.isfinite(value) for value in (min_position, max_position, max_abs_velocity)):
+        raise ValueError("constraint bounds must be finite")
+    if min_position > max_position or max_abs_velocity < 0:
+        raise ValueError("position bounds must be ordered and velocity bound non-negative")
     return {
         "position_lower_bound": lambda s: s.position >= min_position,
         "position_upper_bound": lambda s: s.position <= max_position,
