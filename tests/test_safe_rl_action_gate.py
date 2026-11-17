@@ -37,6 +37,24 @@ class ActionGateTests(unittest.TestCase):
         self.assertEqual(result.decision, GateDecision.BLOCK)
         self.assertIsNone(result.selected)
 
+    def test_non_positive_or_non_finite_dt_is_rejected(self):
+        for dt in (0, -1, float("nan"), float("inf")):
+            with self.subTest(dt=dt):
+                with self.assertRaises(ValueError):
+                    ActionGate({}, dt=dt)
+
+    def test_non_finite_state_and_action_are_rejected(self):
+        with self.assertRaises(ValueError):
+            State(float("nan"), 0)
+        with self.assertRaises(ValueError):
+            Action(float("inf"))
+
+    def test_invalid_bounds_are_rejected(self):
+        with self.assertRaises(ValueError):
+            bounded_constraints(min_position=5, max_position=1, max_abs_velocity=3)
+        with self.assertRaises(ValueError):
+            bounded_constraints(min_position=0, max_position=10, max_abs_velocity=float("inf"))
+
 
 if __name__ == "__main__":
     unittest.main()
