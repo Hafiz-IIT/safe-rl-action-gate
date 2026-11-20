@@ -7,9 +7,15 @@ import math
 
 
 def _finite_number(name: str, value: float) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{name} must be a finite number")
-    return float(value)
+    try:
+        normalized = float(value)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a finite number") from exc
+    if not math.isfinite(normalized):
+        raise ValueError(f"{name} must be a finite number")
+    return normalized
 
 
 class GateDecision(str, Enum):
@@ -71,8 +77,14 @@ class ActionGate:
             for name, predicate in constraints.items()
         ):
             raise ValueError("constraints must map non-empty names to callables")
-        self.constraints = dict(constraints)
+        self._constraints = dict(constraints)
         self.dt = dt
+
+    @property
+    def constraints(self):
+        # Expose a read-only snapshot; callers cannot remove guards after construction.
+        from types import MappingProxyType
+        return MappingProxyType(self._constraints)
 
     def violations(self, state: State, action: Action) -> tuple[str, ...]:
         try:
@@ -80,7 +92,7 @@ class ActionGate:
         except (ArithmeticError, ValueError):
             return ("simulation_error",)
         violations = []
-        for name, predicate in self.constraints.items():
+        for name, predicate in self._constraints.items():
             try:
                 result = predicate(next_state)
             except Exception:
