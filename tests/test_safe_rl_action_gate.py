@@ -15,6 +15,23 @@ class ActionGateTests(unittest.TestCase):
             bounded_constraints(min_position=0, max_position=10, max_abs_velocity=3)
         )
 
+    def test_empty_constraint_set_is_rejected(self):
+        with self.assertRaises(ValueError):
+            ActionGate({})
+
+    def test_invalid_numeric_inputs_are_rejected(self):
+        with self.assertRaises(ValueError):
+            State(float("nan"), 0)
+        with self.assertRaises(ValueError):
+            Action(1, "")
+        with self.assertRaises(ValueError):
+            ActionGate(bounded_constraints(min_position=0, max_position=10, max_abs_velocity=3), dt=0)
+
+    def test_constraint_exception_fails_closed(self):
+        gate = ActionGate({"sensor": lambda state: (_ for _ in ()).throw(RuntimeError("sensor failure"))})
+        result = gate.choose(State(1, 0), Action(0))
+        self.assertEqual(result.decision, GateDecision.BLOCK)
+
     def test_safe_action_allowed(self):
         result = self.gate.choose(State(2, 0), Action(1))
         self.assertEqual(result.decision, GateDecision.ALLOW)
