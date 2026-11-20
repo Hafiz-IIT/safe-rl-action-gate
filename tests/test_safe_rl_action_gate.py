@@ -32,6 +32,12 @@ class ActionGateTests(unittest.TestCase):
         result = gate.choose(State(1, 0), Action(0))
         self.assertEqual(result.decision, GateDecision.BLOCK)
 
+    def test_simulation_overflow_fails_closed(self):
+        gate = ActionGate({"position": lambda state: state.position < 10})
+        result = gate.choose(State(1e308, 1e308), Action(1e308))
+        self.assertEqual(result.decision, GateDecision.BLOCK)
+        self.assertIn("simulation_error", result.violations)
+
     def test_safe_action_allowed(self):
         result = self.gate.choose(State(2, 0), Action(1))
         self.assertEqual(result.decision, GateDecision.ALLOW)
