@@ -75,7 +75,10 @@ class ActionGate:
         self.dt = dt
 
     def violations(self, state: State, action: Action) -> tuple[str, ...]:
-        next_state = step(state, action, self.dt)
+        try:
+            next_state = step(state, action, self.dt)
+        except (ArithmeticError, ValueError):
+            return ("simulation_error",)
         violations = []
         for name, predicate in self.constraints.items():
             try:
