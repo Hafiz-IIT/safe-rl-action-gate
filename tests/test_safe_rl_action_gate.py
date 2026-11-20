@@ -38,6 +38,23 @@ class ActionGateTests(unittest.TestCase):
         self.assertEqual(result.decision, GateDecision.BLOCK)
         self.assertIn("simulation_error", result.violations)
 
+    def test_constraints_cannot_be_mutated_after_gate_construction(self):
+        with self.assertRaises((AttributeError, TypeError)):
+            self.gate.constraints.clear()
+        with self.assertRaises(TypeError):
+            self.gate.constraints["bypass"] = lambda state: True
+        result = self.gate.choose(State(9, 1), Action(2, "unsafe"))
+        self.assertEqual(result.decision, GateDecision.BLOCK)
+
+    def test_extremely_large_integers_are_rejected_as_non_finite(self):
+        huge = 10 ** 10000
+        with self.assertRaises(ValueError):
+            State(huge, 0)
+        with self.assertRaises(ValueError):
+            Action(huge)
+        with self.assertRaises(ValueError):
+            bounded_constraints(min_position=0, max_position=huge, max_abs_velocity=3)
+
     def test_safe_action_allowed(self):
         result = self.gate.choose(State(2, 0), Action(1))
         self.assertEqual(result.decision, GateDecision.ALLOW)
