@@ -6,6 +6,12 @@ from typing import Callable, Sequence
 import math
 
 
+def _finite_number(name: str, value: float) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite number")
+    return float(value)
+
+
 class GateDecision(str, Enum):
     ALLOW = "ALLOW"
     SUBSTITUTE = "SUBSTITUTE"
@@ -18,8 +24,8 @@ class State:
     velocity: float
 
     def __post_init__(self):
-        if not all(math.isfinite(value) for value in (self.position, self.velocity)):
-            raise ValueError("state values must be finite")
+        _finite_number("position", self.position)
+        _finite_number("velocity", self.velocity)
 
 
 @dataclass(frozen=True)
@@ -28,8 +34,7 @@ class Action:
     name: str = "candidate"
 
     def __post_init__(self):
-        if not math.isfinite(self.acceleration):
-            raise ValueError("action acceleration must be finite")
+        _finite_number("acceleration", self.acceleration)
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("action name must be a non-empty string")
 
@@ -46,8 +51,11 @@ Constraint = Callable[[State], bool]
 
 
 def step(state: State, action: Action, dt: float = 1.0) -> State:
-    if not math.isfinite(dt) or dt <= 0:
-        raise ValueError("dt must be finite and positive")
+    if not isinstance(state, State) or not isinstance(action, Action):
+        raise TypeError("step requires State and Action values")
+    dt = _finite_number("dt", dt)
+    if dt <= 0:
+        raise ValueError("dt must be positive")
     velocity = state.velocity + action.acceleration * dt
     position = state.position + velocity * dt
     return State(position=position, velocity=velocity)
@@ -55,9 +63,10 @@ def step(state: State, action: Action, dt: float = 1.0) -> State:
 
 class ActionGate:
     def __init__(self, constraints: dict[str, Constraint], dt: float = 1.0):
-        if not math.isfinite(dt) or dt <= 0:
-            raise ValueError("dt must be finite and positive")
-        if not isinstance(constraints, dict) or any(
+        dt = _finite_number("dt", dt)
+        if dt <= 0:
+            raise ValueError("dt must be positive")
+        if not isinstance(constraints, dict) or not constraints or any(
             not isinstance(name, str) or not name.strip() or not callable(predicate)
             for name, predicate in constraints.items()
         ):
@@ -67,10 +76,16 @@ class ActionGate:
 
     def violations(self, state: State, action: Action) -> tuple[str, ...]:
         next_state = step(state, action, self.dt)
-        return tuple(
-            name for name, predicate in self.constraints.items()
-            if not predicate(next_state)
-        )
+        violations = []
+        for name, predicate in self.constraints.items():
+            try:
+                result = predicate(next_state)
+            except Exception:
+                violations.append(f"constraint_error:{name}")
+                continue
+            if not isinstance(result, bool) or not result:
+                violations.append(name if isinstance(result, bool) else f"constraint_invalid:{name}")
+        return tuple(violations)
 
     def choose(
         self,
@@ -78,6 +93,12 @@ class ActionGate:
         requested: Action,
         alternatives: Sequence[Action] = (),
     ) -> GateResult:
+        if not isinstance(state, State) or not isinstance(requested, Action):
+            raise TypeError("choose requires State and Action values")
+        if not isinstance(alternatives, Sequence) or isinstance(alternatives, (str, bytes)):
+            raise ValueError("alternatives must be a sequence of Action values")
+        if any(not isinstance(action, Action) for action in alternatives):
+            raise ValueError("alternatives must contain only Action values")
         requested_violations = self.violations(state, requested)
         if not requested_violations:
             return GateResult(GateDecision.ALLOW, requested, requested, ())
@@ -113,8 +134,9 @@ def bounded_constraints(
     max_position: float,
     max_abs_velocity: float,
 ) -> dict[str, Constraint]:
-    if not all(math.isfinite(value) for value in (min_position, max_position, max_abs_velocity)):
-        raise ValueError("constraint bounds must be finite")
+    min_position = _finite_number("min_position", min_position)
+    max_position = _finite_number("max_position", max_position)
+    max_abs_velocity = _finite_number("max_abs_velocity", max_abs_velocity)
     if min_position > max_position or max_abs_velocity < 0:
         raise ValueError("position bounds must be ordered and velocity bound non-negative")
     return {
