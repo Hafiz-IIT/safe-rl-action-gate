@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Iterable, Sequence
+import math
+from typing import Callable, Mapping, Sequence
 
 
 class GateDecision(str, Enum):
@@ -11,16 +12,30 @@ class GateDecision(str, Enum):
     BLOCK = "BLOCK"
 
 
+def _finite_number(value, field: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"{field} must be a finite number")
+
+
 @dataclass(frozen=True)
 class State:
     position: float
     velocity: float
+
+    def __post_init__(self):
+        _finite_number(self.position, "position")
+        _finite_number(self.velocity, "velocity")
 
 
 @dataclass(frozen=True)
 class Action:
     acceleration: float
     name: str = "candidate"
+
+    def __post_init__(self):
+        _finite_number(self.acceleration, "acceleration")
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError("action name must be a non-empty string")
 
 
 @dataclass(frozen=True)
@@ -35,22 +50,51 @@ Constraint = Callable[[State], bool]
 
 
 def step(state: State, action: Action, dt: float = 1.0) -> State:
+    if not isinstance(state, State) or not isinstance(action, Action):
+        raise TypeError("state and action must be validated State and Action instances")
+    _finite_number(dt, "dt")
+    if dt <= 0:
+        raise ValueError("dt must be greater than zero")
     velocity = state.velocity + action.acceleration * dt
     position = state.position + velocity * dt
+    _finite_number(velocity, "predicted velocity")
+    _finite_number(position, "predicted position")
     return State(position=position, velocity=velocity)
 
 
 class ActionGate:
-    def __init__(self, constraints: dict[str, Constraint], dt: float = 1.0):
+    def __init__(self, constraints: Mapping[str, Constraint], dt: float = 1.0):
+        if not isinstance(constraints, Mapping) or not constraints:
+            raise ValueError("constraints must be a non-empty mapping")
+        for name, predicate in constraints.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("constraint names must be non-empty strings")
+            if not callable(predicate):
+                raise TypeError(f"constraint {name} must be callable")
+        _finite_number(dt, "dt")
+        if dt <= 0:
+            raise ValueError("dt must be greater than zero")
         self.constraints = dict(constraints)
         self.dt = dt
 
     def violations(self, state: State, action: Action) -> tuple[str, ...]:
-        next_state = step(state, action, self.dt)
-        return tuple(
-            name for name, predicate in self.constraints.items()
-            if not predicate(next_state)
-        )
+        try:
+            next_state = step(state, action, self.dt)
+        except (TypeError, ValueError, OverflowError):
+            return ("invalid_state_action_or_transition",)
+
+        violations = []
+        for name, predicate in self.constraints.items():
+            try:
+                result = predicate(next_state)
+            except Exception:
+                violations.append(f"constraint_evaluation_error:{name}")
+                continue
+            if type(result) is not bool:
+                violations.append(f"constraint_non_boolean_result:{name}")
+            elif not result:
+                violations.append(name)
+        return tuple(violations)
 
     def choose(
         self,
@@ -58,6 +102,11 @@ class ActionGate:
         requested: Action,
         alternatives: Sequence[Action] = (),
     ) -> GateResult:
+        if not isinstance(alternatives, Sequence) or isinstance(alternatives, (str, bytes)):
+            raise TypeError("alternatives must be a sequence of Action instances")
+        if any(not isinstance(action, Action) for action in alternatives):
+            raise TypeError("alternatives must contain only Action instances")
+
         requested_violations = self.violations(state, requested)
         if not requested_violations:
             return GateResult(GateDecision.ALLOW, requested, requested, ())
@@ -67,10 +116,13 @@ class ActionGate:
             if not self.violations(state, action)
         ]
         if safe_alternatives:
-            # Minimal intervention: choose closest acceleration to the requested action.
             selected = min(
                 safe_alternatives,
-                key=lambda a: abs(a.acceleration - requested.acceleration),
+                key=lambda action: (
+                    abs(action.acceleration - requested.acceleration),
+                    action.name,
+                    action.acceleration,
+                ),
             )
             return GateResult(
                 GateDecision.SUBSTITUTE,
@@ -93,10 +145,20 @@ def bounded_constraints(
     max_position: float,
     max_abs_velocity: float,
 ) -> dict[str, Constraint]:
+    for name, value in (
+        ("min_position", min_position),
+        ("max_position", max_position),
+        ("max_abs_velocity", max_abs_velocity),
+    ):
+        _finite_number(value, name)
+    if min_position > max_position:
+        raise ValueError("min_position cannot exceed max_position")
+    if max_abs_velocity < 0:
+        raise ValueError("max_abs_velocity must be non-negative")
     return {
-        "position_lower_bound": lambda s: s.position >= min_position,
-        "position_upper_bound": lambda s: s.position <= max_position,
-        "velocity_bound": lambda s: abs(s.velocity) <= max_abs_velocity,
+        "position_lower_bound": lambda state: state.position >= min_position,
+        "position_upper_bound": lambda state: state.position <= max_position,
+        "velocity_bound": lambda state: abs(state.velocity) <= max_abs_velocity,
     }
 
 
